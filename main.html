@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+
+body {
+	background-color:#1c1f22;
+	width: 15em;
+	margin: 0;
+	padding: 0;
+}
+
+div {
+	height: 3em;
+	padding: 1em;
+}
+div:hover {
+	background-color: #45484b;
+	cursor: pointer;
+}
+
+div > img {
+	height: 3em;
+	
+}
+
+p {
+	color: white;
+	font-size: 12pt;
+	margin: 1em;
+}
+
+a {
+	display: block;
+	color: #2bbb90;
+}
+
+</style>
+<script>
+	
+	window.addEventListener("DOMContentLoaded", function(){
+		
+		var elms = {
+			txtError: document.getElementById("txt-error"),
+			btnOdysee: document.getElementById("btn-odysee"),
+			btnLbrytv: document.getElementById("btn-lbrytv"),
+			btnLbryapp: document.getElementById("btn-lbryapp")
+		};
+		
+		for(var key in elms)
+			elms[key].style.display = "none";
+		
+		chrome.tabs.query({active: true, currentWindow: true}, async tabs => {
+			var background = chrome.extension.getBackgroundPage();
+
+			if(tabs.length === 0)
+				return;
+			var tabId = tabs[0].id;
+			var tabUrl = tabs[0].url;
+			var lbryUrl = await background.GetLbryUrl(tabUrl);
+			
+			if(lbryUrl != null){
+				elms.btnOdysee.style.display = "block";
+				elms.btnLbrytv.style.display = "block";
+				elms.btnLbryapp.style.display = "block";
+				
+				function tabChanged(){
+					chrome.tabs.update(tabId, { muted: true });
+					window.close();
+				}
+				
+				elms.btnOdysee.onclick = function(){
+					chrome.tabs.create({"url": "https://odysee.com/"+lbryUrl});
+					tabChanged();
+				};
+				elms.btnLbrytv.onclick = function(){
+					chrome.tabs.create({"url": "https://lbry.tv/"+lbryUrl});
+					tabChanged();
+				};
+				elms.btnLbryapp.onclick = function(){
+					chrome.tabs.executeScript({ code: 'window.location = "lbry://"'+lbryUrl+'";' });
+					tabChanged();
+				};
+			}
+			else{
+				elms.txtError.style.display = "block";
+				
+				if(tabUrl.indexOf("youtube.com/watch") > -1){
+					var match = /v=([\w\d_-]+)/i.exec(tabUrl); // https://www.youtube.com/watch?v=44VUgbT5QLo
+					if(match != null && match.length > 1){
+						var a = document.createElement("a");
+						a.href = "https://api.lbry.com/yt/resolve?video_ids="+match[1];
+						a.innerText = a.href;
+						elms.txtError.appendChild(a);
+					}
+				}
+				else if(tabUrl.indexOf("youtube.com/channel") > -1){
+					var match = /\/channel\/([\w\d_-]+)/i.exec(tabUrl); // https://www.youtube.com/channel/UCfwE_ODI1YTbdjkzuSi1Nag
+					if(match != null && match.length > 1){
+						var a = document.createElement("a");
+						a.href = "https://api.lbry.com/yt/resolve?channel_ids="+match[1];
+						a.innerText = a.href;
+						elms.txtError.appendChild(a);
+					}
+				}
+			}
+		});
+		
+	});
+
+</script>
+</head>
+<body>
+	<p id="txt-error">Not found on lbry</p>
+	<div id="btn-odysee" title="Watch on Odysee.com"><img src="/images/odysee_white.png" /></div>
+	<div id="btn-lbrytv" title="Watch on Lbry.tv"><img src="/images/lbrytv.png" /></div>
+	<div id="btn-lbryapp" title="Watch on Lbry Desktop"><img src="/images/lbryapp.png" /></div>
+</body>
+</html>
